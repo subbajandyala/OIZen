@@ -13,36 +13,95 @@ const HEADERS = {
   'Accept-Language': 'en-US,en;q=0.9',
   'Referer': 'https://web.sensibull.com/',
   'Origin': 'https://web.sensibull.com',
-  'sec-ch-ua': '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
-  'sec-ch-ua-mobile': '?0',
-  'sec-ch-ua-platform': '"Windows"',
   'cookie': SENSIBULL_COOKIE
 };
 
-// OI Analysis endpoint
+// Try multiple endpoints and return whichever has data
+async function fetchOIData(symbol) {
+  const endpoints = [
+    // Option chain endpoint - most reliable
+    `https://api.sensibull.com/v1/option_chain/${symbol}`,
+    // OI change vs strike
+    `https://api.sensibull.com/v1/oi_change_vs_strike?tradingsymbol=${symbol}`,
+    // OI analysis
+    `https://api.sensibull.com/v1/instruments/${symbol}/oi_analysis`,
+    // Live OI
+    `https://api.sensibull.com/v1/live_oi/${symbol}`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const r = await axios.get(url, { headers: HEADERS, timeout: 8000 });
+      const d = r.data;
+      // Check if data is not empty
+      if (d && (
+        (Array.isArray(d.data) && d.data.length > 0) ||
+        (d.data && typeof d.data === 'object' && Object.keys(d.data).length > 0) ||
+        d.total_call_oi || d.totalCallOI || d.call_oi
+      )) {
+        return { url, data: d };
+      }
+    } catch(e) {
+      // try next
+    }
+  }
+  return null;
+}
+
+// Main OI endpoint
 app.get('/oi/:symbol', async (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
   try {
-    const url = `https://api.sensibull.com/v1/instruments/${req.params.symbol}/oi_analysis`;
-    const r = await axios.get(url, { headers: HEADERS });
-    res.json(r.data);
+    const result = await fetchOIData(symbol);
+    if (result) {
+      res.json({ status: true, source: 'live', endpoint: result.url, data: result.data });
+    } else {
+      res.json({ status: false, source: 'none', message: 'All endpoints returned empty', data: [] });
+    }
   } catch(e) {
-    console.error(req.params.symbol, e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// OI Change endpoint (fallback)
-app.get('/oichange/:symbol', async (req, res) => {
+// Raw proxy - pass through any sensibull API path
+// e.g. /proxy/v1/option_chain/NIFTY
+app.get('/proxy/*', async (req, res) => {
+  const path = req.params[0];
+  const query = new URLSearchParams(req.query).toString();
+  const url = `https://api.sensibull.com/${path}${query ? '?' + query : ''}`;
   try {
-    const url = `https://api.sensibull.com/v1/oi_change/${req.params.symbol}`;
-    const r = await axios.get(url, { headers: HEADERS });
+    const r = await axios.get(url, { headers: HEADERS, timeout: 10000 });
     res.json(r.data);
   } catch(e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message, url });
   }
 });
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
+
+// Debug - shows what endpoints return for a symbol
+app.get('/debug/:symbol', async (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
+  const endpoints = [
+    `https://api.sensibull.com/v1/option_chain/${symbol}`,
+    `https://api.sensibull.com/v1/oi_change_vs_strike?tradingsymbol=${symbol}`,
+    `https://api.sensibull.com/v1/instruments/${symbol}/oi_analysis`,
+    `https://api.sensibull.com/v1/live_oi/${symbol}`,
+  ];
+  const results = [];
+  for (const url of endpoints) {
+    try {
+      const r = await axios.get(url, { headers: HEADERS, timeout: 6000 });
+      const d = r.data;
+      const dataLen = Array.isArray(d?.data) ? d.data.length :
+                      (d?.data && typeof d.data === 'object') ? Object.keys(d.data).length : '?';
+      results.push({ url, status: r.status, dataLength: dataLen, keys: Object.keys(d) });
+    } catch(e) {
+      results.push({ url, error: e.message });
+    }
+  }
+  res.json(results);
+});
 
 app.listen(process.env.PORT || 3001, () => console.log('OIZen proxy running'));
