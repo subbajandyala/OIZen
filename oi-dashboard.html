@@ -216,9 +216,9 @@ th:hover .hl-wrap{opacity:.8}
     <button class="chip" data-sector="INFRA" onclick="setSector('INFRA')">Infra</button>
     <button class="chip" data-sector="FINANCE" onclick="setSector('FINANCE')">Finance</button>
   </div>
-  <div class="mode-wrap">
-    <button class="mchip active" id="m-mock" onclick="setMode('mock')">Demo</button>
-    <button class="mchip" id="m-live" onclick="setMode('live')">Live</button>
+  <div class="mode-wrap" style="display:none">
+    <button class="mchip" id="m-mock" onclick="setMode('mock')">Demo</button>
+    <button class="mchip active" id="m-live" onclick="setMode('live')">Live</button>
     <button class="mchip" id="m-proxy" onclick="setMode('proxy')">Proxy</button>
   </div>
 </div>
@@ -515,7 +515,7 @@ const ALL_FNO = [
 ];
 
 // ── State ──────────────────────────────────────────
-let mode = 'mock';
+let mode = 'live';
 let sector = 'ALL';
 let sortCol = 'i';
 let sortDir = 1;
@@ -608,8 +608,8 @@ function mockResult(sym) {
 
 async function fetchOI(sym) {
   if (mode==='mock') return mockResult(sym);
-  const base = `https://api.sensibull.com/v1/instruments/${sym}/oi_analysis`;
-  const url  = mode==='proxy' ? `http://localhost:8080/${base}` : base;
+  const base = `https://oizen-subba.up.railway.app/oi/${sym}`;
+  const url  = base;
   try {
     const r = await fetch(url, {headers:{Accept:'application/json'},signal:AbortSignal.timeout(9000)});
     if (!r.ok) throw new Error('HTTP '+r.status);
