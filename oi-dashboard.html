@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NSE F&O OI Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080b10;--surface:#0e1117;--card:#131720;--border:#1c2235;
+  --accent:#00d4aa;--red:#ff4d6d;--green:#00d4aa;--yellow:#ffc94d;
+  --blue:#4d9fff;--purple:#a78bfa;
+  --call:#ff6b8a;--put:#3dd68c;
+  --text:#dde2f0;--muted:#4a5068;--dim:#2a3050;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;min-height:100vh;overflow-x:hidden}
+
+body::before{content:'';position:fixed;inset:0;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(0,212,170,.07),transparent);
+  pointer-events:none;z-index:0}
+
+.wrap{max-width:1300px;margin:0 auto;padding:20px 16px;position:relative;z-index:1}
+
+/* ── HEADER ── */
+header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#0099ff);
+  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.logo h1{font-family:'Syne',sans-serif;font-size:clamp(18px,3vw,24px);font-weight:800;
+  color:#fff;letter-spacing:-0.5px}
+.logo h1 span{color:var(--accent)}
+.logo p{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:1px}
+
+.hbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:7px;background:var(--card);
+  border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:11px;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dot.live{background:var(--accent);animation:blink 1.4s infinite}
+.dot.err{background:var(--red)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+#cd{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:58px}
+.btn{border:none;border-radius:8px;font-family:'JetBrains Mono',monospace;
+  font-weight:700;font-size:12px;padding:9px 18px;cursor:pointer;
+  transition:all .15s;white-space:nowrap;letter-spacing:.3px}
+.btn-g{background:var(--accent);color:#000}
+.btn-g:hover{opacity:.85;transform:translateY(-1px)}
+.btn-o{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-o:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── PROGRESS ── */
+.prog-wrap{height:2px;background:var(--dim);border-radius:2px;margin-bottom:18px;overflow:hidden}
+#prog{height:100%;background:linear-gradient(90deg,var(--accent),#0099ff);width:100%;transition:width 1s linear}
+
+/* ── STATS ROW ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.stat-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.stat-val{font-size:17px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+.stat-val.green{color:var(--green)}
+.stat-val.red{color:var(--red)}
+.stat-val.yellow{color:var(--yellow)}
+
+/* ── CONTROLS ── */
+.controls{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:16px;margin-bottom:18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--bg);
+  border:1px solid var(--border);border-radius:8px;padding:8px 12px;flex:1;min-width:180px}
+.search-box input{background:none;border:none;color:var(--text);font-family:'JetBrains Mono',monospace;
+  font-size:13px;outline:none;width:100%}
+.search-box input::placeholder{color:var(--muted)}
+.search-icon{color:var(--muted);font-size:14px;flex-shrink:0}
+
+.filter-wrap{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer;
+  border:1px solid var(--border);color:var(--muted);background:transparent;
+  font-family:'JetBrains Mono',monospace;transition:all .15s}
+.chip.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,170,.08)}
+.chip:hover:not(.active){border-color:var(--dim);color:var(--text)}
+
+.mode-wrap{display:flex;gap:6px;margin-left:auto}
+.mchip{padding:5px 12px;border-radius:6px;font-size:10px;cursor:pointer;
+  border:1px solid var(--border);color:var(--muted);background:transparent;
+  font-family:'JetBrains Mono',monospace;transition:all .15s;letter-spacing:.5px;text-transform:uppercase}
+.mchip.active{border-color:var(--yellow);color:var(--yellow);background:rgba(255,201,77,.07)}
+
+/* ── TABLE ── */
+.tbl-wrap{border-radius:12px;border:1px solid var(--border);overflow:hidden;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{background:var(--surface);padding:11px 14px;text-align:left;
+  font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+  border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--text)}
+thead th.sorted{color:var(--accent)}
+thead th .sort-arrow{margin-left:4px;opacity:.6}
+
+tbody tr{border-bottom:1px solid var(--border);transition:background .12s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,.022)}
+
+td{padding:11px 14px;white-space:nowrap;vertical-align:middle}
+
+.sym{font-weight:700;font-size:13px;color:#fff;letter-spacing:.3px}
+.sec-badge{display:inline-block;font-size:9px;padding:2px 6px;border-radius:4px;
+  margin-left:6px;vertical-align:middle;background:var(--dim);color:var(--muted);
+  letter-spacing:.5px;font-weight:400}
+
+.ltp{font-variant-numeric:tabular-nums;font-size:13px}
+.ltp.up{color:var(--green)}
+.ltp.dn{color:var(--red)}
+.ltp-chg{font-size:10px;margin-left:4px;opacity:.8}
+
+.oi-n{font-variant-numeric:tabular-nums;font-weight:600}
+.call-n{color:var(--call)}
+.put-n{color:var(--put)}
+
+.pcr-chip{display:inline-block;padding:3px 9px;border-radius:14px;
+  font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+.pcr-bull{background:rgba(61,214,140,.12);color:var(--put)}
+.pcr-bear{background:rgba(255,107,138,.12);color:var(--call)}
+.pcr-neu{background:rgba(255,201,77,.1);color:var(--yellow)}
+
+.st{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px}
+.st-ok{background:rgba(0,212,170,.1);color:var(--accent)}
+.st-err{background:rgba(255,77,109,.1);color:var(--red)}
+.st-load{background:rgba(74,80,104,.15);color:var(--muted)}
+.spin{display:inline-block;width:9px;height:9px;border:1.5px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.empty{text-align:center;padding:50px;color:var(--muted)}
+
+/* ── NOTICE ── */
+.notice{background:rgba(255,201,77,.05);border:1px solid rgba(255,201,77,.2);
+  border-radius:8px;padding:10px 14px;font-size:11px;color:var(--yellow);
+  margin-bottom:14px;line-height:1.6}
+
+/* ── FOOTER ── */
+.foot{margin-top:14px;display:flex;justify-content:space-between;
+  flex-wrap:wrap;gap:6px;font-size:10px;color:var(--muted)}
+
+/* ── SELECTED COUNT ── */
+.sel-info{font-size:11px;color:var(--muted)}
+.sel-info span{color:var(--accent)}
+
+/* mini bar */
+.bar-mini{display:flex;height:5px;border-radius:3px;overflow:hidden;width:90px;gap:1px}
+.bar-c{background:var(--call);border-radius:2px}
+.bar-p{background:var(--put);border-radius:2px}
+
+/* ── HIGH / LOW SORT BUTTONS ── */
+.hl-wrap{display:inline-flex;flex-direction:column;margin-left:5px;
+  gap:1px;vertical-align:middle;opacity:.45;transition:opacity .15s}
+th:hover .hl-wrap{opacity:.8}
+.hl-btn{background:none;border:none;cursor:pointer;padding:0;line-height:1;
+  font-size:9px;color:inherit;display:block;transition:all .12s}
+.hl-btn:hover{transform:scale(1.3)}
+.hl-btn.active{color:var(--accent);opacity:1;transform:scale(1.2)}
+.hl-btn.active-call{color:var(--call)!important}
+.hl-btn.active-put{color:var(--put)!important}
+.hl-btn.active-pcr{color:var(--yellow)!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div>
+      <h1>NSE F&O <span>OI Tracker</span></h1>
+      <p>All 200+ F&amp;O Stocks · Auto-refresh</p>
+    </div>
+  </div>
+  <div class="hbar">
+    <div class="pill"><div class="dot" id="dot"></div><span id="lbl">IDLE</span></div>
+    <span id="cd">—</span>
+    <button class="btn btn-o" style="padding:6px 12px;font-size:11px" onclick="fetchAll()">↺ Now</button>
+    <button class="btn btn-g" onclick="startTracking()">▶ Start</button>
+  </div>
+</header>
+
+<div class="prog-wrap"><div id="prog"></div></div>
+
+<!-- STATS -->
+<div class="stats-row" id="stats-row">
+  <div class="stat-card"><div class="stat-label">Total Stocks</div><div class="stat-val" id="s-total">—</div></div>
+  <div class="stat-card"><div class="stat-label">Loaded</div><div class="stat-val green" id="s-loaded">0</div></div>
+  <div class="stat-card"><div class="stat-label">Errors</div><div class="stat-val red" id="s-err">0</div></div>
+  <div class="stat-card"><div class="stat-label">Bullish PCR &gt;1</div><div class="stat-val green" id="s-bull">—</div></div>
+  <div class="stat-card"><div class="stat-label">Bearish PCR &lt;0.8</div><div class="stat-val red" id="s-bear">—</div></div>
+  <div class="stat-card"><div class="stat-label">INDIAVIX</div><div class="stat-val yellow" id="s-vix">—</div></div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search" placeholder="Search symbol or sector..." oninput="renderTable()">
+  </div>
+  <div class="filter-wrap" id="filter-wrap">
+    <button class="chip active" data-sector="ALL" onclick="setSector('ALL')">All</button>
+    <button class="chip" data-sector="INDEX" onclick="setSector('INDEX')">Indices</button>
+    <button class="chip" data-sector="BANK" onclick="setSector('BANK')">Banks</button>
+    <button class="chip" data-sector="IT" onclick="setSector('IT')">IT</button>
+    <button class="chip" data-sector="AUTO" onclick="setSector('AUTO')">Auto</button>
+    <button class="chip" data-sector="PHARMA" onclick="setSector('PHARMA')">Pharma</button>
+    <button class="chip" data-sector="METAL" onclick="setSector('METAL')">Metal</button>
+    <button class="chip" data-sector="ENERGY" onclick="setSector('ENERGY')">Energy</button>
+    <button class="chip" data-sector="FMCG" onclick="setSector('FMCG')">FMCG</button>
+    <button class="chip" data-sector="REALTY" onclick="setSector('REALTY')">Realty</button>
+    <button class="chip" data-sector="INFRA" onclick="setSector('INFRA')">Infra</button>
+    <button class="chip" data-sector="FINANCE" onclick="setSector('FINANCE')">Finance</button>
+  </div>
+  <div class="mode-wrap">
+    <button class="mchip active" id="m-mock" onclick="setMode('mock')">Demo</button>
+    <button class="mchip" id="m-live" onclick="setMode('live')">Live</button>
+    <button class="mchip" id="m-proxy" onclick="setMode('proxy')">Proxy</button>
+  </div>
+</div>
+
+<div class="notice" id="notice">
+  🧪 <b>Demo mode</b> — showing simulated data. Switch to <b>Live</b> for real Sensibull data (may need CORS proxy).
+  Run <code>npx cors-anywhere</code> on port 8080 then use <b>Proxy</b> mode.
+</div>
+
+<!-- TABLE -->
+<div class="tbl-wrap">
+<table>
+  <thead>
+    <tr>
+      <th onclick="sortBy('i')">#<span class="sort-arrow" id="sa-i"></span></th>
+      <th onclick="sortBy('sym')">Script<span class="sort-arrow" id="sa-sym"></span></th>
+      <th>LTP
+        <span class="hl-wrap">
+          <button class="hl-btn" id="hl-ltp-h" onclick="event.stopPropagation();hlSort('ltp','h')" title="Highest LTP first">▲</button>
+          <button class="hl-btn" id="hl-ltp-l" onclick="event.stopPropagation();hlSort('ltp','l')" title="Lowest LTP first">▼</button>
+        </span>
+      </th>
+      <th style="color:var(--call)">Total Call OI
+        <span class="hl-wrap">
+          <button class="hl-btn" id="hl-callOI-h" onclick="event.stopPropagation();hlSort('callOI','h')" title="Highest Call OI first">▲</button>
+          <button class="hl-btn" id="hl-callOI-l" onclick="event.stopPropagation();hlSort('callOI','l')" title="Lowest Call OI first">▼</button>
+        </span>
+      </th>
+      <th style="color:var(--put)">Total Put OI
+        <span class="hl-wrap">
+          <button class="hl-btn" id="hl-putOI-h" onclick="event.stopPropagation();hlSort('putOI','h')" title="Highest Put OI first">▲</button>
+          <button class="hl-btn" id="hl-putOI-l" onclick="event.stopPropagation();hlSort('putOI','l')" title="Lowest Put OI first">▼</button>
+        </span>
+      </th>
+      <th>Call/Put Ratio</th>
+      <th style="color:var(--yellow)">PCR
+        <span class="hl-wrap">
+          <button class="hl-btn" id="hl-pcr-h" onclick="event.stopPropagation();hlSort('pcr','h')" title="Highest PCR first">▲</button>
+          <button class="hl-btn" id="hl-pcr-l" onclick="event.stopPropagation();hlSort('pcr','l')" title="Lowest PCR first">▼</button>
+        </span>
+      </th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+</div>
+
+<div class="foot">
+  <span id="last-up">Last updated: —</span>
+  <span class="sel-info">Showing <span id="shown">0</span> of <span id="total-shown">0</span> symbols</span>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+// COMPLETE NSE F&O STOCK LIST (223 stocks + indices)
+// Sectors: INDEX, BANK, IT, AUTO, PHARMA, METAL, ENERGY,
+//          FMCG, REALTY, INFRA, FINANCE, TELECOM, MISC
+// ═══════════════════════════════════════════════════════
+const ALL_FNO = [
+  // Indices
+  {s:'NIFTY',     sec:'INDEX', lot:25,   name:'Nifty 50'},
+  {s:'BANKNIFTY', sec:'INDEX', lot:15,   name:'Bank Nifty'},
+  {s:'FINNIFTY',  sec:'INDEX', lot:40,   name:'Fin Nifty'},
+  {s:'MIDCPNIFTY',sec:'INDEX', lot:75,   name:'Midcap Nifty'},
+  {s:'SENSEX',    sec:'INDEX', lot:10,   name:'BSE Sensex'},
+  {s:'BANKEX',    sec:'INDEX', lot:15,   name:'BSE Bankex'},
+
+  // Banks
+  {s:'HDFCBANK',  sec:'BANK',  lot:550,  name:'HDFC Bank'},
+  {s:'ICICIBANK', sec:'BANK',  lot:700,  name:'ICICI Bank'},
+  {s:'KOTAKBANK', sec:'BANK',  lot:400,  name:'Kotak Mahindra Bank'},
+  {s:'AXISBANK',  sec:'BANK',  lot:1200, name:'Axis Bank'},
+  {s:'SBIN',      sec:'BANK',  lot:1500, name:'State Bank of India'},
+  {s:'BANKBARODA',sec:'BANK',  lot:5850, name:'Bank of Baroda'},
+  {s:'PNB',       sec:'BANK',  lot:8000, name:'Punjab National Bank'},
+  {s:'CANBK',     sec:'BANK',  lot:5000, name:'Canara Bank'},
+  {s:'UNIONBANK', sec:'BANK',  lot:10000,name:'Union Bank'},
+  {s:'IDFCFIRSTB',sec:'BANK',  lot:10000,name:'IDFC First Bank'},
+  {s:'FEDERALBNK',sec:'BANK',  lot:5000, name:'Federal Bank'},
+  {s:'RBLBANK',   sec:'BANK',  lot:5000, name:'RBL Bank'},
+  {s:'BANDHANBNK',sec:'BANK',  lot:5000, name:'Bandhan Bank'},
+  {s:'INDUSINDBK',sec:'BANK',  lot:700,  name:'IndusInd Bank'},
+  {s:'YESBANK',   sec:'BANK',  lot:40000,name:'Yes Bank'},
+  {s:'AUBANK',    sec:'BANK',  lot:1000, name:'AU Small Finance Bank'},
+  {s:'KARURVYSYA',sec:'BANK',  lot:3000, name:'Karur Vysya Bank'},
+
+  // IT
+  {s:'TCS',       sec:'IT',    lot:175,  name:'Tata Consultancy'},
+  {s:'INFY',      sec:'IT',    lot:400,  name:'Infosys'},
+  {s:'WIPRO',     sec:'IT',    lot:1500, name:'Wipro'},
+  {s:'HCLTECH',   sec:'IT',    lot:700,  name:'HCL Technologies'},
+  {s:'TECHM',     sec:'IT',    lot:600,  name:'Tech Mahindra'},
+  {s:'LTIM',      sec:'IT',    lot:150,  name:'LTIMindtree'},
+  {s:'MPHASIS',   sec:'IT',    lot:350,  name:'Mphasis'},
+  {s:'COFORGE',   sec:'IT',    lot:200,  name:'Coforge'},
+  {s:'PERSISTENT',sec:'IT',    lot:150,  name:'Persistent Systems'},
+  {s:'KPITTECH',  sec:'IT',    lot:1000, name:'KPIT Technologies'},
+  {s:'LTTS',      sec:'IT',    lot:200,  name:'L&T Technology'},
+
+  // Auto
+  {s:'MARUTI',    sec:'AUTO',  lot:100,  name:'Maruti Suzuki'},
+  {s:'TATAMOTORS',sec:'AUTO',  lot:1400, name:'Tata Motors'},
+  {s:'M&M',       sec:'AUTO',  lot:700,  name:'Mahindra & Mahindra'},
+  {s:'BAJAJ-AUTO',sec:'AUTO',  lot:250,  name:'Bajaj Auto'},
+  {s:'HEROMOTOCO',sec:'AUTO',  lot:300,  name:'Hero MotoCorp'},
+  {s:'EICHERMOT', sec:'AUTO',  lot:175,  name:'Eicher Motors'},
+  {s:'ASHOKLEY',  sec:'AUTO',  lot:5000, name:'Ashok Leyland'},
+  {s:'TVSMOTOR',  sec:'AUTO',  lot:700,  name:'TVS Motor'},
+  {s:'BALKRISIND',sec:'AUTO',  lot:500,  name:'Balkrishna Industries'},
+  {s:'MOTHERSON', sec:'AUTO',  lot:7000, name:'Motherson Sumi'},
+  {s:'BOSCHLTD',  sec:'AUTO',  lot:50,   name:'Bosch'},
+  {s:'ESCORTS',   sec:'AUTO',  lot:400,  name:'Escorts Kubota'},
+  {s:'EXIDEIND',  sec:'AUTO',  lot:3600, name:'Exide Industries'},
+  {s:'AMARAJABAT',sec:'AUTO',  lot:1000, name:'Amara Raja Energy'},
+
+  // Pharma
+  {s:'SUNPHARMA', sec:'PHARMA',lot:700,  name:'Sun Pharmaceutical'},
+  {s:'DRREDDY',   sec:'PHARMA',lot:250,  name:'Dr Reddys Labs'},
+  {s:'CIPLA',     sec:'PHARMA',lot:650,  name:'Cipla'},
+  {s:'DIVISLAB',  sec:'PHARMA',lot:200,  name:"Divi's Laboratories"},
+  {s:'AUROPHARMA',sec:'PHARMA',lot:700,  name:'Aurobindo Pharma'},
+  {s:'BIOCON',    sec:'PHARMA',lot:3000, name:'Biocon'},
+  {s:'LUPIN',     sec:'PHARMA',lot:650,  name:'Lupin'},
+  {s:'ALKEM',     sec:'PHARMA',lot:200,  name:'Alkem Laboratories'},
+  {s:'IPCALAB',   sec:'PHARMA',lot:700,  name:'IPCA Laboratories'},
+  {s:'GLENMARK',  sec:'PHARMA',lot:1150, name:'Glenmark Pharma'},
+  {s:'TORNTPHARM',sec:'PHARMA',lot:500,  name:'Torrent Pharma'},
+  {s:'ZYDUSLIFE', sec:'PHARMA',lot:1400, name:'Zydus Lifesciences'},
+  {s:'ABBOTINDIA',sec:'PHARMA',lot:100,  name:'Abbott India'},
+
+  // Metal
+  {s:'TATASTEEL', sec:'METAL', lot:5500, name:'Tata Steel'},
+  {s:'JSWSTEEL',  sec:'METAL', lot:1350, name:'JSW Steel'},
+  {s:'HINDALCO',  sec:'METAL', lot:2150, name:'Hindalco Industries'},
+  {s:'VEDL',      sec:'METAL', lot:2700, name:'Vedanta'},
+  {s:'NATIONALUM',sec:'METAL', lot:7500, name:'National Aluminium'},
+  {s:'SAIL',      sec:'METAL', lot:10000,name:'SAIL'},
+  {s:'HINDCOPPER',sec:'METAL', lot:5000, name:'Hindustan Copper'},
+  {s:'NMDC',      sec:'METAL', lot:3750, name:'NMDC'},
+  {s:'JINDALSTEL',sec:'METAL', lot:1250, name:'Jindal Steel'},
+  {s:'WELCORP',   sec:'METAL', lot:1500, name:'Welspun Corp'},
+  {s:'APLAPOLLO', sec:'METAL', lot:1100, name:'APL Apollo Tubes'},
+
+  // Energy / Oil
+  {s:'RELIANCE',  sec:'ENERGY',lot:250,  name:'Reliance Industries'},
+  {s:'ONGC',      sec:'ENERGY',lot:3850, name:'ONGC'},
+  {s:'IOC',       sec:'ENERGY',lot:5250, name:'Indian Oil Corp'},
+  {s:'BPCL',      sec:'ENERGY',lot:3800, name:'BPCL'},
+  {s:'HINDPETRO', sec:'ENERGY',lot:2700, name:'HPCL'},
+  {s:'GAIL',      sec:'ENERGY',lot:6450, name:'GAIL India'},
+  {s:'PETRONET',  sec:'ENERGY',lot:3000, name:'Petronet LNG'},
+  {s:'OIL',       sec:'ENERGY',lot:1850, name:'Oil India'},
+  {s:'POWERGRID', sec:'ENERGY',lot:2700, name:'Power Grid Corp'},
+  {s:'NTPC',      sec:'ENERGY',lot:3000, name:'NTPC'},
+  {s:'ADANIGREEN',sec:'ENERGY',lot:600,  name:'Adani Green Energy'},
+  {s:'ADANIPORTS',sec:'ENERGY',lot:1250, name:'Adani Ports'},
+  {s:'ADANIENT',  sec:'ENERGY',lot:400,  name:'Adani Enterprises'},
+  {s:'ADANIPOWER',sec:'ENERGY',lot:3000, name:'Adani Power'},
+  {s:'TATAPOWER', sec:'ENERGY',lot:3375, name:'Tata Power'},
+  {s:'TORNTPOWER',sec:'ENERGY',lot:500,  name:'Torrent Power'},
+  {s:'CESC',      sec:'ENERGY',lot:1400, name:'CESC'},
+  {s:'SJVN',      sec:'ENERGY',lot:9000, name:'SJVN'},
+
+  // FMCG
+  {s:'HINDUNILVR',sec:'FMCG',  lot:300,  name:'Hindustan Unilever'},
+  {s:'ITC',       sec:'FMCG',  lot:3200, name:'ITC'},
+  {s:'NESTLEIND', sec:'FMCG',  lot:40,   name:'Nestle India'},
+  {s:'BRITANNIA', sec:'FMCG',  lot:200,  name:'Britannia Industries'},
+  {s:'DABUR',     sec:'FMCG',  lot:2750, name:'Dabur India'},
+  {s:'MARICO',    sec:'FMCG',  lot:1500, name:'Marico'},
+  {s:'GODREJCP',  sec:'FMCG',  lot:1000, name:'Godrej Consumer'},
+  {s:'COLPAL',    sec:'FMCG',  lot:700,  name:'Colgate-Palmolive'},
+  {s:'EMAMILTD',  sec:'FMCG',  lot:1800, name:'Emami'},
+  {s:'UBL',       sec:'FMCG',  lot:700,  name:'United Breweries'},
+  {s:'RADICO',    sec:'FMCG',  lot:500,  name:'Radico Khaitan'},
+  {s:'MCDOWELL-N',sec:'FMCG',  lot:1250, name:'United Spirits'},
+
+  // Realty
+  {s:'DLF',       sec:'REALTY',lot:1650, name:'DLF'},
+  {s:'GODREJPROP',sec:'REALTY',lot:650,  name:'Godrej Properties'},
+  {s:'PRESTIGE',  sec:'REALTY',lot:1200, name:'Prestige Estates'},
+  {s:'OBEROIRLTY',sec:'REALTY',lot:700,  name:'Oberoi Realty'},
+  {s:'SOBHA',     sec:'REALTY',lot:700,  name:'Sobha'},
+  {s:'BRIGADE',   sec:'REALTY',lot:1400, name:'Brigade Enterprises'},
+  {s:'PHOENIXLTD',sec:'REALTY',lot:800,  name:'Phoenix Mills'},
+  {s:'LODHA',     sec:'REALTY',lot:900,  name:'Macrotech Dev'},
+  {s:'SUNTECK',   sec:'REALTY',lot:2500, name:'Sunteck Realty'},
+
+  // Infra / Cement
+  {s:'LARSENTOUBRO',sec:'INFRA',lot:300, name:'Larsen & Toubro'},
+  {s:'ULTRACEMCO',sec:'INFRA',  lot:100,  name:'UltraTech Cement'},
+  {s:'SHREECEM',  sec:'INFRA',  lot:25,   name:'Shree Cement'},
+  {s:'GRASIM',    sec:'INFRA',  lot:475,  name:'Grasim Industries'},
+  {s:'ACC',       sec:'INFRA',  lot:500,  name:'ACC'},
+  {s:'AMBUJACEM', sec:'INFRA',  lot:3000, name:'Ambuja Cements'},
+  {s:'IRB',       sec:'INFRA',  lot:10000,name:'IRB Infrastructure'},
+  {s:'GMRINFRA',  sec:'INFRA',  lot:15000,name:'GMR Airports'},
+  {s:'CUMMINSIND',sec:'INFRA',  lot:300,  name:'Cummins India'},
+  {s:'BEL',       sec:'INFRA',  lot:5450, name:'Bharat Electronics'},
+  {s:'HAL',       sec:'INFRA',  lot:300,  name:'Hindustan Aeronautics'},
+  {s:'BHEL',      sec:'INFRA',  lot:7000, name:'BHEL'},
+  {s:'ABB',       sec:'INFRA',  lot:200,  name:'ABB India'},
+  {s:'SIEMENS',   sec:'INFRA',  lot:275,  name:'Siemens'},
+  {s:'SOLARINDS', sec:'INFRA',  lot:100,  name:'Solar Industries'},
+  {s:'NBCC',      sec:'INFRA',  lot:8000, name:'NBCC India'},
+  {s:'CONCOR',    sec:'INFRA',  lot:2500, name:'Container Corp'},
+  {s:'IRCTC',     sec:'INFRA',  lot:875,  name:'IRCTC'},
+  {s:'PFC',       sec:'INFRA',  lot:3000, name:'Power Fin Corp'},
+  {s:'REC',       sec:'INFRA',  lot:3150, name:'REC Limited'},
+
+  // Finance / NBFC
+  {s:'BAJFINANCE',sec:'FINANCE',lot:125, name:'Bajaj Finance'},
+  {s:'BAJAJFINSV',sec:'FINANCE',lot:500, name:'Bajaj Finserv'},
+  {s:'HDFC',      sec:'FINANCE',lot:300, name:'HDFC Ltd'},
+  {s:'LICHSGFIN', sec:'FINANCE',lot:2000,name:'LIC Housing Finance'},
+  {s:'CHOLAFIN',  sec:'FINANCE',lot:1250,name:'Cholamandalam Finance'},
+  {s:'MUTHOOTFIN',sec:'FINANCE',lot:750, name:'Muthoot Finance'},
+  {s:'M&MFIN',    sec:'FINANCE',lot:3000,name:'M&M Financial'},
+  {s:'MANAPPURAM',sec:'FINANCE',lot:6000,name:'Manappuram Finance'},
+  {s:'SHRIRAMFIN',sec:'FINANCE',lot:700, name:'Shriram Finance'},
+  {s:'SBICARD',   sec:'FINANCE',lot:2000,name:'SBI Cards'},
+  {s:'SBILIFE',   sec:'FINANCE',lot:750, name:'SBI Life Insurance'},
+  {s:'HDFCLIFE',  sec:'FINANCE',lot:1100,name:'HDFC Life Insurance'},
+  {s:'ICICIPRULI',sec:'FINANCE',lot:1500,name:'ICICI Pru Life'},
+  {s:'ICICIGI',   sec:'FINANCE',lot:400, name:'ICICI Lombard'},
+  {s:'LICI',      sec:'FINANCE',lot:700, name:'LIC of India'},
+  {s:'NAUKRI',    sec:'FINANCE',lot:200, name:'Info Edge'},
+  {s:'POLICYBZR', sec:'FINANCE',lot:1250,name:'PB Fintech'},
+  {s:'PAYTM',     sec:'FINANCE',lot:2000,name:'Paytm (One 97)'},
+
+  // Telecom
+  {s:'BHARTIARTL',sec:'TELECOM',lot:550, name:'Bharti Airtel'},
+  {s:'IDEA',      sec:'TELECOM',lot:70000,name:'Vodafone Idea'},
+  {s:'INDUSTOWER',sec:'TELECOM',lot:2800,name:'Indus Towers'},
+
+  // Misc / Conglomerate
+  {s:'ASIANPAINT',sec:'MISC',  lot:200,  name:'Asian Paints'},
+  {s:'TITAN',     sec:'MISC',  lot:750,  name:'Titan Company'},
+  {s:'BERGEPAINT',sec:'MISC',  lot:1100, name:'Berger Paints'},
+  {s:'PIDILITIND',sec:'MISC',  lot:500,  name:'Pidilite Industries'},
+  {s:'HAVELLS',   sec:'MISC',  lot:1000, name:'Havells India'},
+  {s:'VOLTAS',    sec:'MISC',  lot:1250, name:'Voltas'},
+  {s:'WHIRLPOOL', sec:'MISC',  lot:750,  name:'Whirlpool India'},
+  {s:'BLUEDART',  sec:'MISC',  lot:200,  name:'Blue Dart Express'},
+  {s:'INDIGO',    sec:'MISC',  lot:350,  name:'InterGlobe Aviation'},
+  {s:'SPICEJET',  sec:'MISC',  lot:12500,name:'SpiceJet'},
+  {s:'ZOMATO',    sec:'MISC',  lot:4500, name:'Zomato'},
+  {s:'NYKAA',     sec:'MISC',  lot:3000, name:'FSN E-Commerce (Nykaa)'},
+  {s:'DELHIVERY', sec:'MISC',  lot:4750, name:'Delhivery'},
+  {s:'TATAELXSI',sec:'MISC',   lot:350,  name:'Tata Elxsi'},
+  {s:'DIXON',     sec:'MISC',  lot:100,  name:'Dixon Technologies'},
+  {s:'KALYANKJIL',sec:'MISC',  lot:3000, name:'Kalyan Jewellers'},
+  {s:'TRENT',     sec:'MISC',  lot:350,  name:'Trent'},
+  {s:'ABFRL',     sec:'MISC',  lot:5000, name:'Aditya Birla Fashion'},
+  {s:'PAGEIND',   sec:'MISC',  lot:30,   name:'Page Industries'},
+  {s:'VBL',       sec:'MISC',  lot:1250, name:'Varun Beverages'},
+  {s:'JUBLFOOD',  sec:'MISC',  lot:1250, name:'Jubilant FoodWorks'},
+  {s:'DEVYANI',   sec:'MISC',  lot:3750, name:'Devyani International'},
+  {s:'WESTLIFE',  sec:'MISC',  lot:2500, name:'Westlife FoodWorld'},
+  {s:'BATAINDIA', sec:'MISC',  lot:500,  name:'Bata India'},
+  {s:'RAJESHEXPO',sec:'MISC',  lot:2500, name:'Rajesh Exports'},
+  {s:'GODREJIND', sec:'MISC',  lot:1250, name:'Godrej Industries'},
+  {s:'AFFLE',     sec:'MISC',  lot:1500, name:'Affle India'},
+  {s:'TANLA',     sec:'MISC',  lot:1750, name:'Tanla Platforms'},
+  {s:'HAPPYFORGE',sec:'MISC',  lot:1500, name:'Happy Forgings'},
+  {s:'CAMPUS',    sec:'MISC',  lot:3600, name:'Campus Activewear'},
+  {s:'LAXMIMACH', sec:'MISC',  lot:300,  name:'Lakshmi Machine Works'},
+  {s:'FLUOROCHEM',sec:'MISC',  lot:900,  name:'Gujarat Fluorochem'},
+  {s:'DEEPAKNTR', sec:'MISC',  lot:500,  name:'Deepak Nitrite'},
+  {s:'ATUL',      sec:'MISC',  lot:125,  name:'Atul Ltd'},
+  {s:'SRF',       sec:'MISC',  lot:375,  name:'SRF Ltd'},
+  {s:'PIIND',     sec:'MISC',  lot:250,  name:'PI Industries'},
+  {s:'UPL',       sec:'MISC',  lot:2600, name:'UPL'},
+  {s:'CHAMBALFERT',sec:'MISC', lot:5000, name:'Chambal Fertilisers'},
+  {s:'GNFC',      sec:'MISC',  lot:1600, name:'GNFC'},
+  {s:'MCX',       sec:'MISC',  lot:500,  name:'MCX India'},
+  {s:'BSE',       sec:'MISC',  lot:500,  name:'BSE Ltd'},
+  {s:'CDSL',      sec:'MISC',  lot:1150, name:'CDSL'},
+  {s:'ANGELONE',  sec:'MISC',  lot:600,  name:'Angel One'},
+  {s:'MOTILALOFS',sec:'MISC',  lot:500,  name:'Motilal Oswal FS'},
+  {s:'IIFL',      sec:'MISC',  lot:2500, name:'IIFL Finance'},
+  {s:'5PAISA',    sec:'MISC',  lot:2500, name:'5Paisa Capital'},
+  {s:'DMART',     sec:'MISC',  lot:375,  name:'Avenue Supermarts'},
+  {s:'APOLLOHOSP',sec:'MISC',  lot:250,  name:'Apollo Hospitals'},
+  {s:'FORTIS',    sec:'MISC',  lot:3500, name:'Fortis Healthcare'},
+  {s:'MAXHEALTH', sec:'MISC',  lot:1000, name:'Max Healthcare'},
+  {s:'RAINBOW',   sec:'MISC',  lot:1250, name:'Rainbow Children'},
+  {s:'KIMS',      sec:'MISC',  lot:750,  name:'Krishna Institute'},
+  {s:'METROPOLIS',sec:'MISC',  lot:400,  name:'Metropolis Healthcare'},
+  {s:'THYROCARE', sec:'MISC',  lot:850,  name:'Thyrocare Technologies'},
+];
+
+// ── State ──────────────────────────────────────────
+let mode = 'mock';
+let sector = 'ALL';
+let sortCol = 'i';
+let sortDir = 1;
+let timer = null;
+let countdown = 60;
+let data = {}; // symbol -> result
+
+// Base mock values (realistic)
+const MOCK_BASE = {};
+ALL_FNO.forEach(f => {
+  const lt = f.sec==='INDEX' ? (Math.random()*20000+5000) : (Math.random()*3000+200);
+  MOCK_BASE[f.s] = { ltp: +lt.toFixed(2), callBase: Math.round(Math.random()*5e7+1e6), putBase: Math.round(Math.random()*4e7+8e5) };
+});
+
+// ── Mode ───────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  ['mock','live','proxy'].forEach(x => document.getElementById('m-'+x).classList.toggle('active', x===m));
+  const n = document.getElementById('notice');
+  if (m==='mock') n.innerHTML='🧪 <b>Demo mode</b> — simulated data with realistic jitter. Switch to <b>Live</b> for real Sensibull data.';
+  else if (m==='live') n.innerHTML='🌐 <b>Live mode</b> — fetching from Sensibull API directly. CORS errors expected in browser. Use <b>Proxy</b> mode locally.';
+  else n.innerHTML='🔄 <b>Proxy mode</b> — routing via cors-anywhere on <code>localhost:8080</code>. Run: <code>npx cors-anywhere</code>';
+}
+
+// ── Sector filter ──────────────────────────────────
+function setSector(s) {
+  sector = s;
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.sector===s));
+  renderTable();
+}
+
+// ── High / Low sort ────────────────────────────────
+let hlActive = null;
+const HL_ACCENT = { ltp:'', callOI:'active-call', putOI:'active-put', pcr:'active-pcr' };
+
+function hlSort(col, dir) {
+  if (hlActive && hlActive.col===col && hlActive.dir===dir) {
+    hlActive = null; sortCol='i'; sortDir=1;
+    clearHlButtons(); renderTable(); return;
+  }
+  hlActive = { col, dir };
+  sortCol = col;
+  sortDir = dir==='h' ? -1 : 1;
+  clearHlButtons();
+  const btn = document.getElementById('hl-'+col+'-'+dir);
+  if (btn) { btn.classList.add('active'); const x=HL_ACCENT[col]; if(x) btn.classList.add(x); }
+  renderTable();
+}
+
+function clearHlButtons() {
+  document.querySelectorAll('.hl-btn').forEach(b=>b.classList.remove('active','active-call','active-put','active-pcr'));
+}
+
+function applyRangeFilters(rows) { return rows; }
+
+// ── Sort (# and Script columns) ────────────────────
+function sortBy(col) {
+  hlActive = null; clearHlButtons();
+  if (sortCol===col) sortDir *= -1; else { sortCol=col; sortDir=col==='i'?1:-1; }
+  document.querySelectorAll('[id^=sa-]').forEach(e => e.textContent='');
+  const arrow = document.getElementById('sa-'+col);
+  if (arrow) arrow.textContent = sortDir===1 ? ' ↑' : ' ↓';
+  renderTable();
+}
+
+// ── Format ─────────────────────────────────────────
+function fOI(n) {
+  if (n==null) return '—';
+  if (n>=1e7) return (n/1e7).toFixed(2)+' Cr';
+  if (n>=1e5) return (n/1e5).toFixed(2)+' L';
+  if (n>=1e3) return (n/1e3).toFixed(1)+' K';
+  return n.toLocaleString('en-IN');
+}
+function fLTP(n) {
+  if (n==null) return '—';
+  return '₹'+parseFloat(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// ── Fetch ──────────────────────────────────────────
+function mockResult(sym) {
+  const prev = data[sym];
+  const b = MOCK_BASE[sym];
+  const j = () => 1+(Math.random()-.5)*.05;
+  const callOI = Math.round((prev?.callOI||b.callBase)*j());
+  const putOI  = Math.round((prev?.putOI||b.putBase)*j());
+  const ltp    = +((prev?.ltp||b.ltp)*j()).toFixed(2);
+  const prevLtp= prev?.ltp||ltp;
+  return { sym, callOI, putOI, pcr:putOI/callOI, ltp, ltpDelta:ltp-prevLtp, error:null };
+}
+
+async function fetchOI(sym) {
+  if (mode==='mock') return mockResult(sym);
+  const base = `https://api.sensibull.com/v1/instruments/${sym}/oi_analysis`;
+  const url  = mode==='proxy' ? `http://localhost:8080/${base}` : base;
+  try {
+    const r = await fetch(url, {headers:{Accept:'application/json'},signal:AbortSignal.timeout(9000)});
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json();
+    const d = j?.data||j;
+    const callOI = d?.total_call_oi??d?.totalCallOI??null;
+    const putOI  = d?.total_put_oi??d?.totalPutOI??null;
+    const pcr    = d?.pcr??(callOI&&putOI?putOI/callOI:null);
+    const ltp    = d?.ltp??d?.last_price??null;
+    const prevLtp= data[sym]?.ltp??ltp;
+    return { sym, callOI, putOI, pcr, ltp, ltpDelta:(ltp??0)-(prevLtp??0), error:null };
+  } catch(e) {
+    return { sym, callOI:null, putOI:null, pcr:null, ltp:null, ltpDelta:0, error:e.message };
+  }
+}
+
+async function fetchAll() {
+  setDot('load');
+  const symbols = ALL_FNO.map(f=>f.s);
+  // Fetch in batches of 10 to avoid overwhelming
+  const BATCH = 10;
+  for (let i=0; i<symbols.length; i+=BATCH) {
+    const batch = symbols.slice(i,i+BATCH);
+    const results = await Promise.all(batch.map(fetchOI));
+    results.forEach(r => { data[r.sym]=r; });
+    renderTable(); updateStats();
+  }
+  document.getElementById('last-up').textContent='Last updated: '+new Date().toLocaleTimeString('en-IN');
+  setDot('live');
+}
+
+// ── Stats ──────────────────────────────────────────
+function updateStats() {
+  const vals = Object.values(data);
+  const loaded = vals.filter(v=>!v.error&&v.callOI!=null).length;
+  const errs   = vals.filter(v=>v.error).length;
+  const bull   = vals.filter(v=>v.pcr!=null&&v.pcr>1).length;
+  const bear   = vals.filter(v=>v.pcr!=null&&v.pcr<.8).length;
+  document.getElementById('s-total').textContent=ALL_FNO.length;
+  document.getElementById('s-loaded').textContent=loaded;
+  document.getElementById('s-err').textContent=errs;
+  document.getElementById('s-bull').textContent=bull;
+  document.getElementById('s-bear').textContent=bear;
+}
+
+// ── Render ─────────────────────────────────────────
+function renderTable() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  let rows = ALL_FNO.map((f,i)=>({...f,i,d:data[f.s]}));
+
+  // Filter
+  if (sector!=='ALL') rows=rows.filter(r=>r.sec===sector);
+  if (q) rows=rows.filter(r=>r.s.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||r.sec.toLowerCase().includes(q));
+  rows = applyRangeFilters(rows);
+
+  // Sort
+  rows.sort((a,b)=>{
+    const da=a.d,db=b.d;
+    if (sortCol==='i') return sortDir*(a.i-b.i);
+    if (sortCol==='sym') return sortDir*a.s.localeCompare(b.s);
+    const va=da?.[sortCol]??-Infinity, vb=db?.[sortCol]??-Infinity;
+    return sortDir*(va-vb);
+  });
+
+  document.getElementById('shown').textContent=rows.length;
+  document.getElementById('total-shown').textContent=ALL_FNO.length;
+
+  const tbody=document.getElementById('tbody');
+  if (!rows.length){tbody.innerHTML=`<tr><td colspan="8" class="empty">No results found</td></tr>`;return;}
+
+  tbody.innerHTML=rows.map((r,idx)=>{
+    const d=r.d;
+    const secColor={INDEX:'#4d9fff',BANK:'#f59e0b',IT:'#a78bfa',AUTO:'#f97316',
+      PHARMA:'#34d399',METAL:'#9ca3af',ENERGY:'#fb923c',FMCG:'#f472b6',
+      REALTY:'#60a5fa',INFRA:'#fbbf24',FINANCE:'#c084fc',TELECOM:'#22d3ee',MISC:'#6b7280'}[r.sec]||'#6b7280';
+
+    if (!d) return `<tr>
+      <td style="color:var(--muted)">${idx+1}</td>
+      <td><span class="sym">${r.s}</span><span class="sec-badge" style="color:${secColor}">${r.sec}</span></td>
+      <td colspan="5" style="color:var(--muted);font-size:11px">—</td>
+      <td><span class="st st-load"><span class="spin"></span></span></td>
+    </tr>`;
+
+    const ltpClass=d.ltpDelta>0?'up':d.ltpDelta<0?'dn':'';
+    const ltpArrow=d.ltpDelta>0?'▲':d.ltpDelta<0?'▼':'';
+    const pcrCls=!d.pcr?'pcr-neu':d.pcr>1?'pcr-bull':d.pcr<.8?'pcr-bear':'pcr-neu';
+
+    // mini bar
+    let barHTML='—';
+    if(d.callOI&&d.putOI){
+      const tot=d.callOI+d.putOI;
+      const cp=Math.round(d.callOI/tot*100);
+      const pp=100-cp;
+      barHTML=`<div class="bar-mini">
+        <div class="bar-c" style="width:${cp}%"></div>
+        <div class="bar-p" style="width:${pp}%"></div>
+      </div>`;
+    }
+
+    return `<tr>
+      <td style="color:var(--muted);font-size:11px">${idx+1}</td>
+      <td>
+        <span class="sym">${r.s}</span>
+        <span class="sec-badge" style="color:${secColor};background:${secColor}18">${r.sec}</span>
+      </td>
+      <td class="ltp ${ltpClass}">${fLTP(d.ltp)}<span class="ltp-chg">${ltpArrow}</span></td>
+      <td class="oi-n call-n">${fOI(d.callOI)}</td>
+      <td class="oi-n put-n">${fOI(d.putOI)}</td>
+      <td>${barHTML}</td>
+      <td>${d.pcr?`<span class="pcr-chip ${pcrCls}">${d.pcr.toFixed(2)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
+      <td>${d.error?`<span class="st st-err" title="${d.error}">✗ Err</span>`:`<span class="st st-ok">✓</span>`}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Timer ──────────────────────────────────────────
+function startTracking() {
+  if (timer) clearInterval(timer);
+  countdown = 60;
+  data = {};
+  renderTable();
+  fetchAll();
+  timer=setInterval(()=>{
+    countdown--;
+    document.getElementById('cd').textContent=`↺ ${countdown}s`;
+    document.getElementById('prog').style.width=(countdown/60*100)+'%';
+    if(countdown<=0){countdown=60;fetchAll();}
+  },1000);
+}
+
+// ── Dot ────────────────────────────────────────────
+function setDot(s) {
+  const dot=document.getElementById('dot'),lbl=document.getElementById('lbl');
+  dot.className='dot';
+  if(s==='live'){dot.classList.add('live');lbl.textContent=mode==='mock'?'DEMO':'LIVE';}
+  else if(s==='load'){lbl.textContent='FETCH…';}
+  else{dot.classList.add('err');lbl.textContent='ERROR';}
+}
+
+// ── Init ───────────────────────────────────────────
+document.getElementById('s-total').textContent=ALL_FNO.length;
+renderTable(); updateStats();
+</script>
+</body>
+</html>
